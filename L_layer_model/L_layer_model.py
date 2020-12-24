@@ -71,6 +71,30 @@ def init_params(n_x, n_l1, n_yhat, random_on=False, seed=1):
     return params
 
 
+# L layers
+# init parameters
+def L_init_params(layer_dims, random_on=False, seed=1):
+    """
+    Argument:
+    n_x: number of input layer nodes
+    n_l1: number of nodes layer 1
+    n_yhat: number of nodes output layer
+    random_on: use random seed
+    seed: specify random seed
+    """
+    if(random_on):
+        np.random.seed(seed)
+
+    params = {}
+    L = len(layer_dims)
+
+    for l in range(1, L):
+        params["W" + str(l)] = np.random.randn(layer_dims[l], layer_dims[l - 1]) * 0.01
+        params["b" + str(l)] = np.zeros((layer_dims[l], 1))
+
+    return params
+
+
 def sigmoid(Z):
     return 1 / (1 + np.exp(-Z))
 
@@ -275,8 +299,7 @@ def two_layer_model(X, Y, layer_dims, random_on, seed, iterations,
 
 def L_layer_model(X, Y, layer_dims, random_on, seed, iterations,
                   learning_rate, print_on, plot_on):
-    n_x, n_l1, n_yhat = layer_dims
-    params = init_params(n_x, n_l1, n_yhat, random_on, seed)
+    params = L_init_params(layer_dims, random_on, seed)
     return L_layer_model_continue(X, Y, params, iterations,
                                   learning_rate, print_on, plot_on)
 

@@ -6,14 +6,14 @@ import numpy as np
 import h5py
 import matplotlib.pyplot as plt
 
-from L_layer_model import *
+from L_layer_model.L_layer_model import *
 
 
 def test_load_data():
     print()
     print("Test load data")
     # TODO: Create dateset from open source images and use is here
-    filename = "catvnoncat_2.h5"
+    filename = "datasets/catvnoncat_2.h5"
     X, Y = load_data(filename)
     print("X.shape: " + str(X.shape))
     print("Y.shape: " + str(Y.shape))
@@ -40,6 +40,23 @@ def test_init_params():
     assert params["b1"].shape == (n_l1, 1), "Wrong shape"
     assert params["W2"].shape == (n_yhat, n_l1), "Wrong shape"
     assert params["b2"].shape == (n_yhat, 1), "Wrong shape"
+
+
+def test_L_init_params():
+    print()
+    print("Test L layer initialize parameters")
+    layer_dims = [828, 20, 10, 1]
+    L = len(layer_dims)
+    random_on = True
+    seed = 1
+    params = L_init_params(layer_dims, random_on, seed)
+    for l in range(1, L):
+        print("W" + str(l) + ": ", params["W" + str(l)].shape)
+        print("b" + str(l) + ": ", params["b" + str(l)].shape)
+    print("W" + str(L-1) + ": ", params["W" + str(L-1)])
+
+    assert (params["W" + str(l)].shape == (layer_dims[l], layer_dims[l - 1])), "Wrong shape"
+    assert (params["b" + str(l)].shape == (layer_dims[l], 1)), "Wrong shape"
 
 
 def test_sigmoid():
@@ -362,20 +379,20 @@ def main():
     print("Running all tests")
     print()
     test_load_data()
-    test_init_params()
+    test_L_init_params()
     test_sigmoid()
     test_relu()
-    test_preprocess()
-    test_linear_forward()
-    test_linear_activation_forward()
-    test_compute_cost()
-    test_sigmoid_backword()
-    test_relu_backward()
-    test_linear_backward()
-    test_update_params()
-    test_two_layer_forward()
-    test_predict()
-    test_accuracy()
+    #test_preprocess()
+    #test_linear_forward()
+    #test_linear_activation_forward()
+    #test_compute_cost()
+    #test_sigmoid_backword()
+    #test_relu_backward()
+    #test_linear_backward()
+    #test_update_params()
+    #test_two_layer_forward()
+    #test_predict()
+    #test_accuracy()
 
     print()
     print("All tests pass")
