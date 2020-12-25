@@ -12,7 +12,7 @@ from L_layer_model.L_layer_model import *
 def test_load_data():
     print()
     print("Test load data")
-    # TODO: Create dateset from open source images and use is here
+    # TODO: Create dateset from open source images and use it here
     filename = "datasets/catvnoncat_2.h5"
     X, Y = load_data(filename)
     print("X.shape: " + str(X.shape))
@@ -89,7 +89,7 @@ def test_relu():
 def test_preprocess():
     print()
     print("Test preprocess")
-    filename = "catvnoncat_2.h5"
+    filename = "datasets/catvnoncat_2.h5"
     X, Y = load_data(filename)
     X = preprocess(X)
     print("X.shape: ", str(X.shape))
@@ -103,7 +103,7 @@ def test_preprocess():
 def test_linear_forward():
     print()
     print("Test linear forward")
-    filename = "catvnoncat_2.h5"
+    filename = "datasets/catvnoncat_2.h5"
     X, Y = load_data(filename)
     X = preprocess(X)
     params = init_params(X.shape[0], 10, 1)
@@ -119,20 +119,35 @@ def test_linear_forward():
 def test_linear_activation_forward():
     print()
     print("Test linear activation forward")
-    filename = "catvnoncat_2.h5"
+    filename = "datasets/catvnoncat_2.h5"
     X, Y = load_data(filename)
     X = preprocess(X)
     params = init_params(X.shape[0], 10, 1)
     A1, Z = linear_activation_forward(X, params["W1"], params["b1"], "relu")
-    print("type(A1): ", type(A1))
+    print("X.shape[1]: ", X.shape[1])
     assert (A1.shape == (params["W1"].shape[0], X.shape[1])),\
+        "Linear activation forward wrong dimensions"
+
+
+def test_L_linear_activation_forward():
+    print()
+    print("Test L layer linear activation forward")
+    filename = "datasets/catvnoncat_2.h5"
+    X, Y = load_data(filename)
+    X = preprocess(X)
+    params = L_init_params([X.shape[0], 10, 1])
+    L = int(len(params) / 2)
+    AL, Z = L_linear_activation_forward(X, params)
+    print("type(AL): ", type(AL))
+    print("AL.shape: ", AL.shape)
+    assert (AL.shape == (params["W" + str(L)].shape[0], X.shape[1])), \
         "Linear activation forward wrong dimensions"
 
 
 def test_compute_cost():
     print()
     print("Test Compute Cost")
-    filename = "catvnoncat_2.h5"
+    filename = "datasets/catvnoncat_2.h5"
     X, Y = load_data(filename)
     X = preprocess(X)
     n_x = X.shape[0]  # 12288
@@ -151,7 +166,7 @@ def test_compute_cost():
 def test_sigmoid_backword():
     print()
     print("Test sigmoid backward")
-    filename = "catvnoncat_2.h5"
+    filename = "datasets/catvnoncat_2.h5"
     X, Y = load_data(filename)
     X = preprocess(X)
     n_x = X.shape[0]  # 12288
@@ -182,7 +197,7 @@ def test_sigmoid_backword():
 def test_relu_backward():
     print()
     print("Test relu backward")
-    filename = "catvnoncat_2.h5"
+    filename = "datasets/catvnoncat_2.h5"
     X, Y = load_data(filename)
     X = preprocess(X)
     n_x = X.shape[0]  # 12288
@@ -214,7 +229,7 @@ def test_relu_backward():
 def test_linear_backward():
     print()
     print("Test linear backward")
-    filename = "catvnoncat_2.h5"
+    filename = "datasets/catvnoncat_2.h5"
     X, Y = load_data(filename)
     X = preprocess(X)
     n_x = X.shape[0]  # 12288
@@ -251,7 +266,7 @@ def test_linear_activation_backward():
 def test_update_params():
     print()
     print("Test update parameters")
-    filename = "catvnoncat_2.h5"
+    filename = "datasets/catvnoncat_2.h5"
     X, Y = load_data(filename)
     X = preprocess(X)
     n_x = X.shape[0]  # 12288
@@ -298,7 +313,7 @@ def test_update_params():
 def test_two_layer_forward():
     print()
     print("Test two layer forward")
-    filename = "catvnoncat_2.h5"
+    filename = "datasets/catvnoncat_2.h5"
     X, Y = load_data(filename)
     X = preprocess(X)
     n_x = X.shape[0]  # 12288
@@ -316,7 +331,7 @@ def test_two_layer_forward():
 def test_predict():
     print()
     print("Test predictions")
-    filename = "catvnoncat_2.h5"
+    filename = "datasets/catvnoncat_2.h5"
     X, Y = load_data(filename)
     X = preprocess(X)
     X = np.concatenate((X[:, :5], X[:, -5:]), axis=1)
@@ -382,9 +397,10 @@ def main():
     test_L_init_params()
     test_sigmoid()
     test_relu()
-    #test_preprocess()
-    #test_linear_forward()
-    #test_linear_activation_forward()
+    test_preprocess()
+    test_linear_forward()
+    test_linear_activation_forward()
+    test_L_linear_activation_forward()
     #test_compute_cost()
     #test_sigmoid_backword()
     #test_relu_backward()

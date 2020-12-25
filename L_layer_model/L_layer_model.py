@@ -127,6 +127,25 @@ def linear_activation_forward(A0, W, b, activation):
     return A1, Z
 
 
+def L_linear_activation_forward(X, params):
+    Zs = []
+    Al = X
+    L = int(len(params) / 2)
+
+    ##### Be carefull l != L #####
+    # L-1 times linear->relu
+    for l in range(1, L):
+        Al, Z = linear_activation_forward(Al, params['W' + str(l)], params['b' + str(l)],
+                                             activation="relu")
+        Zs.append(Z)
+
+    AL, Z = linear_activation_forward(Al, params['W' + str(L)], params['b' + str(L)],
+                                      activation="sigmoid")
+    Zs.append(Z)
+
+    return AL, Zs
+
+
 def compute_cost(A, Y):
     m = Y.shape[1]
     # Compute loss from A and y.
@@ -255,10 +274,9 @@ def L_layer_model_continue(X, Y, params, iterations,
     costs = []
     for i in range(iterations):
         # foreward propagation
-        A1, Z1 = linear_activation_forward(X, params["W1"], params["b1"], "relu")
-        A2, Z2 = linear_activation_forward(A1, params["W2"], params["b2"], "sigmoid")
+        AL, Z = L_linear_activation_forward(X, params)
         # compute cost
-        cost = compute_cost(A2, Y)
+        cost = compute_cost(AL, Y)
         # backward propagation
         dA2 = - (np.divide(Y, A2) - np.divide(1 - Y, 1 - A2))
         dA1, dW2, db2 = linear_activation_backward(dA2, Z2, A1, params["W2"], "sigmoid")
@@ -333,10 +351,7 @@ def main():
     filename = "../datasets/catvnoncat_2.h5"
     X, Y = load_data(filename)
     X = preprocess(X)
-    n_x = X.shape[0]  # 12288
-    n_l1 = 10
-    n_yhat = 1
-    layer_dims = (n_x, n_l1, n_yhat)
+    layer_dims = [X.shape[0], 10, 1]
     random_on = True
     seed = 1
 
@@ -346,8 +361,8 @@ def main():
     print_on = True
     plot_on = True
 
-    params, costs = two_layer_model(X, Y, layer_dims, random_on, seed, iterations,
-                             learning_rate, print_on, plot_on)
+    params, costs = L_layer_model(X, Y, layer_dims, random_on, seed, iterations,
+                                  learning_rate, print_on, plot_on)
 
     # train accuracy
     p = predict(X, params)
