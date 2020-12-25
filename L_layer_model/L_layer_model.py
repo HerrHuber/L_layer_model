@@ -189,9 +189,44 @@ def linear_activation_backward(dA1, Z, A, W, activation):
     return dA0, dW, db
 
 
+def L_linear_activation_backward(AL, Y, Z):
+    grads = {}
+    L = len(Z)
+    m = AL.shape[1]
+    Y = Y.reshape(AL.shape)
+
+    # initialize backward propagation
+    dAL = - (np.divide(Y, AL) - np.divide(1 - Y, 1 - AL))
+
+    # sigmoid->linear
+    ZL = Z[L - 1]
+    grads["dA" + str(L - 1)], grads["dW" + str(L)], grads["db" + str(L)] = \
+        linear_activation_backward(dAL, ZL, activation="sigmoid")
+
+    # L-1 times relu->linear
+    for l in reversed(range(L - 1)):
+        Zl = Z[l]
+        dAl_1, dW, db = linear_activation_backward(grads["dA" + str(l + 1)],
+                                                   Zl, activation="relu")
+        grads["dA" + str(l)] = dAl_1
+        grads["dW" + str(l + 1)] = dW
+        grads["db" + str(l + 1)] = db
+
+    return grads
+
+
 def update_params(params, grads, learning_rate):
     # 2 = number of layers in the neural network
     for l in range(2):
+        params["W" + str(l + 1)] = params["W" + str(l + 1)] - learning_rate * grads["dW" + str(l + 1)]
+        params["b" + str(l + 1)] = params["b" + str(l + 1)] - learning_rate * grads["db" + str(l + 1)]
+
+    return params
+
+
+def L_update_params(params, grads, learning_rate):
+    L = int(len(params) / 2)
+    for l in range(L):
         params["W" + str(l + 1)] = params["W" + str(l + 1)] - learning_rate * grads["dW" + str(l + 1)]
         params["b" + str(l + 1)] = params["b" + str(l + 1)] - learning_rate * grads["db" + str(l + 1)]
 
@@ -270,7 +305,6 @@ def two_layer_model_continue(X, Y, params, iterations,
 
 def L_layer_model_continue(X, Y, params, iterations,
                            learning_rate, print_on, plot_on):
-    grads = {}
     costs = []
     for i in range(iterations):
         # foreward propagation
@@ -278,16 +312,9 @@ def L_layer_model_continue(X, Y, params, iterations,
         # compute cost
         cost = compute_cost(AL, Y)
         # backward propagation
-        dA2 = - (np.divide(Y, A2) - np.divide(1 - Y, 1 - A2))
-        dA1, dW2, db2 = linear_activation_backward(dA2, Z2, A1, params["W2"], "sigmoid")
-        dA0, dW1, db1 = linear_activation_backward(dA1, Z1, X, params["W1"], "relu")
-
-        grads['dW1'] = dW1
-        grads['db1'] = db1
-        grads['dW2'] = dW2
-        grads['db2'] = db2
+        grads = L_linear_activation_backward(AL, Y, Z)
         # update params
-        params = update_params(params, grads, learning_rate)
+        params = L_update_params(params, grads, learning_rate)
 
         # print cost
         if(print_on):

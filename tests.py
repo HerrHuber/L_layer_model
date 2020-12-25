@@ -263,6 +263,12 @@ def test_linear_activation_backward():
     print("Test pass")
 
 
+def test_L_linear_activation_backward():
+    print()
+    print("Test L layer linear activation backward")
+    print("Test pass")
+
+
 def test_update_params():
     print()
     print("Test update parameters")
@@ -292,6 +298,53 @@ def test_update_params():
     grads['db2'] = db2
 
     params_updated = update_params(params, grads, learning_rate)
+
+    # compare params with params_updated
+    # 2 = number of layers in the neural network
+    for l in range(2):
+        print("params[W" + str(l + 1) + "].shape: ",
+              params["W" + str(l + 1)].shape)
+        print("params_updated[W" + str(l + 1) + "].shape: ",
+              params_updated["W" + str(l + 1)].shape)
+        assert params["W" + str(l + 1)].shape == params_updated["W" + str(l + 1)].shape,\
+            "Dimensions do not match"
+        print("params[b" + str(l + 1) + "].shape: ",
+              params["b" + str(l + 1)].shape)
+        print("params_updated[b" + str(l + 1) + "].shape: ",
+              params_updated["b" + str(l + 1)].shape)
+        assert params["b" + str(l + 1)].shape == params_updated["b" + str(l + 1)].shape,\
+            "Dimensions do not match"
+
+
+def test_L_update_params():
+    print()
+    print("Test update parameters")
+    filename = "datasets/catvnoncat_2.h5"
+    X, Y = load_data(filename)
+    X = preprocess(X)
+    n_x = X.shape[0]  # 12288
+    n_l1 = 10
+    n_yhat = 1
+    random_on = True
+    seed = 1
+    params = init_params(n_x, n_l1, n_yhat, random_on, seed)
+
+    learning_rate = 0.001
+    grads = {}
+    # foreward propagation
+    A1, Z1 = linear_activation_forward(X, params["W1"], params["b1"], "relu")
+    A2, Z2 = linear_activation_forward(A1, params["W2"], params["b2"], "sigmoid")
+    # backward propagation
+    dA2 = - (np.divide(Y, A2) - np.divide(1 - Y, 1 - A2))
+    dA1, dW2, db2 = linear_activation_backward(dA2, Z2, A1, params["W2"], "sigmoid")
+    dA0, dW1, db1 = linear_activation_backward(dA1, Z1, X, params["W1"], "relu")
+
+    grads['dW1'] = dW1
+    grads['db1'] = db1
+    grads['dW2'] = dW2
+    grads['db2'] = db2
+
+    params_updated = L_update_params(params, grads, learning_rate)
 
     # compare params with params_updated
     # 2 = number of layers in the neural network
@@ -401,11 +454,14 @@ def main():
     test_linear_forward()
     test_linear_activation_forward()
     test_L_linear_activation_forward()
-    #test_compute_cost()
-    #test_sigmoid_backword()
-    #test_relu_backward()
-    #test_linear_backward()
-    #test_update_params()
+    test_compute_cost()
+    test_sigmoid_backword()
+    test_relu_backward()
+    test_linear_backward()
+    test_linear_activation_backward()
+    test_L_linear_activation_backward()
+    test_update_params()
+    test_L_update_params()
     #test_two_layer_forward()
     #test_predict()
     #test_accuracy()
