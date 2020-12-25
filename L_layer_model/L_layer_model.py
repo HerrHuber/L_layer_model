@@ -129,21 +129,28 @@ def linear_activation_forward(A0, W, b, activation):
 
 def L_linear_activation_forward(X, params):
     Zs = []
+    As = []
+    Ws = []
     Al = X
     L = int(len(params) / 2)
 
     ##### Be carefull l != L #####
     # L-1 times linear->relu
     for l in range(1, L):
-        Al, Z = linear_activation_forward(Al, params['W' + str(l)], params['b' + str(l)],
+        Al_1 = Al
+        Al, Z = linear_activation_forward(Al_1, params["W" + str(l)], params["b" + str(l)],
                                              activation="relu")
         Zs.append(Z)
+        As.append(Al_1)
+        Ws.append(params["W" + str(l)])
 
-    AL, Z = linear_activation_forward(Al, params['W' + str(L)], params['b' + str(L)],
+    AL, Z = linear_activation_forward(Al, params["W" + str(L)], params['b' + str(L)],
                                       activation="sigmoid")
     Zs.append(Z)
+    As.append(AL)
+    Ws.append(params["W" + str(L)])
 
-    return AL, Zs
+    return AL, Zs, As, Ws
 
 
 def compute_cost(A, Y):
@@ -189,7 +196,7 @@ def linear_activation_backward(dA1, Z, A, W, activation):
     return dA0, dW, db
 
 
-def L_linear_activation_backward(AL, Y, Z):
+def L_linear_activation_backward(AL, Y, Z, A, W):
     grads = {}
     L = len(Z)
     m = AL.shape[1]
@@ -200,14 +207,20 @@ def L_linear_activation_backward(AL, Y, Z):
 
     # sigmoid->linear
     ZL = Z[L - 1]
-    grads["dA" + str(L - 1)], grads["dW" + str(L)], grads["db" + str(L)] = \
-        linear_activation_backward(dAL, ZL, activation="sigmoid")
+    AL = A[L - 1]  # wrong shape (1, 828) instead of (10, 828)
+    WL = W[L - 1]
+    dAL_1, dWL, dbL = linear_activation_backward(dAL, ZL, AL, WL, activation="sigmoid")
+    grads["dA" + str(L - 1)] = dAL_1
+    grads["dW" + str(L)] = dWL
+    grads["db" + str(L)] = dbL
 
     # L-1 times relu->linear
     for l in reversed(range(L - 1)):
         Zl = Z[l]
+        Al = A[l]
+        Wl = W[l]
         dAl_1, dW, db = linear_activation_backward(grads["dA" + str(l + 1)],
-                                                   Zl, activation="relu")
+                                                   Zl, Al, Wl, activation="relu")
         grads["dA" + str(l)] = dAl_1
         grads["dW" + str(l + 1)] = dW
         grads["db" + str(l + 1)] = db
@@ -234,11 +247,15 @@ def L_update_params(params, grads, learning_rate):
 
 
 def two_layer_forward(X, params):
-    A0, cache = linear_activation_forward(X, params["W1"],
+    A0, Z = linear_activation_forward(X, params["W1"],
                                          params["b1"], "relu")
-    A1, cache = linear_activation_forward(A0, params["W2"],
+    A1, Z = linear_activation_forward(A0, params["W2"],
                                           params["b2"], "sigmoid")
     return A1
+
+
+#def L_layer_forward(X, params):
+#    return L_linear_activation_forward(X, params)
 
 
 def predict(X, params):
@@ -247,6 +264,24 @@ def predict(X, params):
 
     # Forward propagation
     probabilities = two_layer_forward(X, params)
+
+    # convert probabilities to 0/1 predictions
+    for i in range(probabilities.shape[1]):
+        if probabilities[0, i] > 0.5:
+            p[0, i] = 1
+        else:
+            p[0, i] = 0
+
+    return p
+
+
+def L_predict(X, params):
+    m = X.shape[1]
+    p = np.zeros((1, m))
+
+    # Forward propagation
+    #probabilities = L_layer_forward(X, params)
+    probabilities, Zs, As, Ws = L_linear_activation_forward(X, params)
 
     # convert probabilities to 0/1 predictions
     for i in range(probabilities.shape[1]):
@@ -308,11 +343,11 @@ def L_layer_model_continue(X, Y, params, iterations,
     costs = []
     for i in range(iterations):
         # foreward propagation
-        AL, Z = L_linear_activation_forward(X, params)
+        AL, Z, A, W = L_linear_activation_forward(X, params)
         # compute cost
         cost = compute_cost(AL, Y)
         # backward propagation
-        grads = L_linear_activation_backward(AL, Y, Z)
+        grads = L_linear_activation_backward(AL, Y, Z, A, W)
         # update params
         params = L_update_params(params, grads, learning_rate)
 
@@ -360,9 +395,24 @@ def classify(imagename, params):
     return predict(img, params)[0]
 
 
+def L_classify(imagename, params):
+    image = Image.open(imagename)
+    image = image.resize((64, 64))
+    img = np.array(image)
+    plt.imshow(img)
+    plt.show()
+    img = preprocess(np.array([img]))
+
+    return L_predict(img, params)[0]
+
+
 def save_params(params, filename):
     np.savez(filename, W1=params["W1"],
             b1=params["b1"], W2=params["W2"], b2=params["b2"])
+
+
+def L_save_params(params, filename):
+    np.savez(filename, **params)
 
 
 def load_params(filename):
@@ -374,11 +424,15 @@ def load_params(filename):
     return newparams
 
 
+def L_load_params(filename):
+    return load_params(filename)
+
+
 def main():
     filename = "../datasets/catvnoncat_2.h5"
     X, Y = load_data(filename)
     X = preprocess(X)
-    layer_dims = [X.shape[0], 10, 1]
+    layer_dims = [X.shape[0], 20, 10, 1]
     random_on = True
     seed = 1
 
@@ -392,7 +446,7 @@ def main():
                                   learning_rate, print_on, plot_on)
 
     # train accuracy
-    p = predict(X, params)
+    p = L_predict(X, params)
     print("Train accuracy: ", accuracy(p, Y))
     # test accuracy
     test_filename = "../datasets/train_catvnoncat.h5"
@@ -402,39 +456,39 @@ def main():
     # reshape from (m,) to (1, m)
     Y_test = Y_test.reshape((1, Y_test.shape[0]))
     X_test = preprocess(X_test)
-    p_test = predict(X_test, params)
+    p_test = L_predict(X_test, params)
     print("Test accuracy: ", accuracy(p_test, Y_test))
 
     # predict new image with pretrained parameters
     imagename = "../images/Image.jpg"
-    prediction = classify(imagename, params)
+    prediction = L_classify(imagename, params)
     print("The model predicts: ", prediction)
 
     print()
     print("Save params")
     print("params.keys: ", params.keys())
-    paramsfilename = "../datasets/catvnoncat_params_1.npz"
-    save_params(params, paramsfilename)
+    paramsfilename = "../datasets/catvnoncat_params_2.npz"
+    L_save_params(params, paramsfilename)
 
-    newparams = load_params(paramsfilename)
+    newparams = L_load_params(paramsfilename)
 
     print("Accuracy of model with loaded parameters")
     # train accuracy
-    p = predict(X, newparams)
+    p = L_predict(X, newparams)
     print("Train accuracy: ", accuracy(p, Y))
-    p_test = predict(X_test, newparams)
+    p_test = L_predict(X_test, newparams)
     print("Test accuracy: ", accuracy(p_test, Y_test))
 
-    newnewparams, newnewcosts = two_layer_model_continue(X, Y, newparams, iterations,
+    newnewparams, newnewcosts = L_layer_model_continue(X, Y, newparams, iterations,
                                                          learning_rate, print_on, plot_on)
 
-    print("newnewcosts: ", newnewcosts)
+    #print("newnewcosts: ", newnewcosts)
 
     print("Accuracy of model with pretrained and additionally trained parameters")
     # train accuracy
-    p = predict(X, newnewparams)
+    p = L_predict(X, newnewparams)
     print("Train accuracy: ", accuracy(p, Y))
-    p_test = predict(X_test, newnewparams)
+    p_test = L_predict(X_test, newnewparams)
     print("Test accuracy: ", accuracy(p_test, Y_test))
 
 

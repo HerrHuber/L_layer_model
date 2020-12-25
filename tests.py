@@ -137,7 +137,7 @@ def test_L_linear_activation_forward():
     X = preprocess(X)
     params = L_init_params([X.shape[0], 10, 1])
     L = int(len(params) / 2)
-    AL, Z = L_linear_activation_forward(X, params)
+    AL, Z, A, W = L_linear_activation_forward(X, params)
     print("type(AL): ", type(AL))
     print("AL.shape: ", AL.shape)
     assert (AL.shape == (params["W" + str(L)].shape[0], X.shape[1])), \
@@ -462,9 +462,9 @@ def main():
     test_L_linear_activation_backward()
     test_update_params()
     test_L_update_params()
-    #test_two_layer_forward()
-    #test_predict()
-    #test_accuracy()
+    test_two_layer_forward()
+    test_predict()
+    test_accuracy()
 
     print()
     print("All tests pass")
