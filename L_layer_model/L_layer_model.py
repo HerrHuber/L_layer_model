@@ -167,7 +167,17 @@ def sigmoid_backward(dA, Z):
     return dZ
 
 
+def sigmoid_backward_reg(AL, Y):
+    return AL - Y
+
+
 def relu_backward(dA, Z):
+    dZ = np.array(dA, copy=True)
+    dZ[Z <= 0] = 0
+    return dZ
+
+
+def relu_backward_reg(dA, Z):
     dZ = np.array(dA, copy=True)
     dZ[Z <= 0] = 0
     return dZ
@@ -445,6 +455,7 @@ def main():
     params, costs = L_layer_model(X, Y, layer_dims, random_on, seed, iterations,
                                   learning_rate, print_on, plot_on)
 
+    print("params.keys(): ", params.keys())
     # train accuracy
     p = L_predict(X, params)
     print("Train accuracy: ", accuracy(p, Y))
