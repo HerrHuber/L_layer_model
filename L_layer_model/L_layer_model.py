@@ -4,6 +4,7 @@
 import time
 import numpy as np
 import h5py
+import math
 import matplotlib.pyplot as plt
 from PIL import Image
 
@@ -217,7 +218,7 @@ def L_linear_activation_backward(AL, Y, Z, A, W):
 
     # sigmoid->linear
     ZL = Z[L - 1]
-    AL = A[L - 1]  # wrong shape (1, 828) instead of (10, 828)
+    AL = A[L - 1]
     WL = W[L - 1]
     dAL_1, dWL, dbL = linear_activation_backward(dAL, ZL, AL, WL, activation="sigmoid")
     grads["dA" + str(L - 1)] = dAL_1
@@ -394,6 +395,135 @@ def L_layer_model(X, Y, layer_dims, random_on, seed, iterations,
                                   learning_rate, print_on, plot_on)
 
 
+def init_adam(parameters):
+    L = int(len(parameters) / 2)
+    v = {}
+    s = {}
+
+    for l in range(L):
+        v["dW" + str(l + 1)] = np.zeros(parameters["W" + str(l + 1)].shape)
+        v["db" + str(l + 1)] = np.zeros(parameters["b" + str(l + 1)].shape)
+        s["dW" + str(l + 1)] = np.zeros(parameters["W" + str(l + 1)].shape)
+        s["db" + str(l + 1)] = np.zeros(parameters["b" + str(l + 1)].shape)
+
+    return v, s
+
+
+def random_mini_batches(X, Y, mini_batch_size=64, seed=0):
+    np.random.seed(seed)
+    m = X.shape[1]  # number of training examples
+    mini_batches = []
+
+    # shuffle
+    permutation = list(np.random.permutation(m))
+    shuffled_X = X[:, permutation]
+    shuffled_Y = Y[:, permutation].reshape((1, m))
+
+    # partition (except end case)
+    num_complete_minibatches = math.floor(m / mini_batch_size)
+    for k in range(num_complete_minibatches):
+        mini_batch_X = shuffled_X[:, k * mini_batch_size:(k + 1) * mini_batch_size]
+        mini_batch_Y = shuffled_Y[:, k * mini_batch_size:(k + 1) * mini_batch_size]
+        mini_batch = (mini_batch_X, mini_batch_Y)
+        mini_batches.append(mini_batch)
+
+    # end case
+    if m % mini_batch_size != 0:
+        mini_batch_X = shuffled_X[:, num_complete_minibatches * mini_batch_size:]
+        mini_batch_Y = shuffled_Y[:, num_complete_minibatches * mini_batch_size:]
+        mini_batch = (mini_batch_X, mini_batch_Y)
+        mini_batches.append(mini_batch)
+
+    return mini_batches
+
+
+def update_params_adam(params, grads, v, s, t, learning_rate=0.01,
+                       beta1=0.9, beta2=0.999, epsilon=1e-8):
+    L = int(len(params) / 2)
+    v_corrected = {}
+    s_corrected = {}
+
+    # adam update
+    for l in range(L):
+        # moving average of gradients
+        v["dW" + str(l + 1)] = beta1 * v["dW" + str(l + 1)] + (1 - beta1) * grads["dW" + str(l + 1)]
+        v["db" + str(l + 1)] = beta1 * v["db" + str(l + 1)] + (1 - beta1) * grads["db" + str(l + 1)]
+
+        # compute bias corrected first moment estimate
+        v_corrected["dW" + str(l + 1)] = v["dW" + str(l + 1)] / (1 - beta1 ** t)
+        v_corrected["db" + str(l + 1)] = v["db" + str(l + 1)] / (1 - beta1 ** t)
+
+        # moving average of squared gradients
+        s["dW" + str(l + 1)] = beta2 * s["dW" + str(l + 1)] + (1 - beta2) * (grads["dW" + str(l + 1)] ** 2)
+        s["db" + str(l + 1)] = beta2 * s["db" + str(l + 1)] + (1 - beta2) * (grads["db" + str(l + 1)] ** 2)
+
+        # compute bias corrected second raw moment estimate
+        s_corrected["dW" + str(l + 1)] = s["dW" + str(l + 1)] / (1 - beta2 ** t)
+        s_corrected["db" + str(l + 1)] = s["db" + str(l + 1)] / (1 - beta2 ** t)
+
+        # Update parameters
+        params["W" + str(l + 1)] = params["W" + str(l + 1)] - learning_rate * v_corrected[
+            "dW" + str(l + 1)] / np.sqrt(s_corrected["dW" + str(l + 1)] + epsilon)
+        params["b" + str(l + 1)] = params["b" + str(l + 1)] - learning_rate * v_corrected[
+            "db" + str(l + 1)] / np.sqrt(s_corrected["db" + str(l + 1)] + epsilon)
+
+    return params, v, s
+
+
+def L_layer_model_opt_continue(X, Y, params, seed, learning_rate=0.0007, mini_batch_size=64, beta=0.9,
+                      beta1=0.9, beta2=0.999, epsilon=1e-8, num_epochs=10000, print_on=True, plot_on=False):
+    costs = []
+    t = 0  # counter for Adam
+
+    v, s = init_adam(params)
+
+    # optimization loop
+    for i in range(num_epochs):
+        # increment seed to reshuffle differently after each epoch
+        seed = seed + 1
+        minibatches = random_mini_batches(X, Y, mini_batch_size, seed)
+        cost = 0
+
+        for minibatch in minibatches:
+            # Select a minibatch
+            (minibatch_X, minibatch_Y) = minibatch
+
+            # forward propagation
+            AL, Z, A, W = L_linear_activation_forward(minibatch_X, params)
+
+            # compute cost
+            cost += compute_cost(AL, minibatch_Y)
+
+            # backward propagation
+            grads = L_linear_activation_backward(AL, minibatch_Y, Z, A, W)
+
+            # update parameters
+            t = t + 1  # Adam counter
+            params, v, s = update_params_adam(params, grads, v, s,
+                                              t, learning_rate, beta1, beta2, epsilon)
+
+        if(print_on and i % 100 == 0):
+            print("Cost after epoch", str(i) + ":", np.squeeze(cost))
+        if(i % 10 == 0):
+            costs.append(float(cost))
+
+    if(plot_on):
+        plt.plot(np.squeeze(costs))
+        plt.ylabel("Cost")
+        plt.xlabel("epochs (per 10)")
+        plt.title("Learning rate =" + str(learning_rate))
+        plt.show()
+
+    return params, costs
+
+
+def L_layer_model_opt(X, Y, layer_dims, random_on, seed, learning_rate=0.0007, mini_batch_size=64, beta=0.9,
+                      beta1=0.9, beta2=0.999, epsilon=1e-8, num_epochs=10000, print_on=True, plot_on=False):
+    params = L_init_params(layer_dims, random_on, seed)
+    return L_layer_model_opt_continue(X, Y, params, seed, learning_rate, mini_batch_size, beta,
+                                      beta1, beta2, epsilon, num_epochs, print_on, plot_on)
+
+
 def classify(imagename, params):
     image = Image.open(imagename)
     image = image.resize((64, 64))
@@ -402,6 +532,7 @@ def classify(imagename, params):
     plt.show()
     img = preprocess(np.array([img]))
 
+    # maybe use np.squeeze
     return predict(img, params)[0]
 
 
@@ -438,7 +569,7 @@ def L_load_params(filename):
     return load_params(filename)
 
 
-def main():
+def L_layer_model_example():
     filename = "../datasets/catvnoncat_2.h5"
     X, Y = load_data(filename)
     X = preprocess(X)
@@ -492,6 +623,76 @@ def main():
 
     newnewparams, newnewcosts = L_layer_model_continue(X, Y, newparams, iterations,
                                                          learning_rate, print_on, plot_on)
+
+    #print("newnewcosts: ", newnewcosts)
+
+    print("Accuracy of model with pretrained and additionally trained parameters")
+    # train accuracy
+    p = L_predict(X, newnewparams)
+    print("Train accuracy: ", accuracy(p, Y))
+    p_test = L_predict(X_test, newnewparams)
+    print("Test accuracy: ", accuracy(p_test, Y_test))
+
+
+def main():
+    filename = "../datasets/catvnoncat_2.h5"
+    X, Y = load_data(filename)
+    X = preprocess(X)
+    layer_dims = [X.shape[0], 10, 1]
+    random_on = True
+    seed = 1
+
+    learning_rate = 0.0003
+    mini_batch_size = 64
+    beta = 0.9
+    beta1 = 0.9
+    beta2 = 0.999
+    epsilon = 1e-8
+    num_epochs = 100
+
+    print_on = True
+    plot_on = True
+
+    params, costs = L_layer_model_opt(X, Y, layer_dims, random_on, seed, learning_rate, mini_batch_size,
+                                      beta, beta1, beta2, epsilon, num_epochs, print_on, plot_on)
+
+    print("params.keys(): ", params.keys())
+    # train accuracy
+    p = L_predict(X, params)
+    print("Train accuracy: ", accuracy(p, Y))
+    # test accuracy
+    test_filename = "../datasets/train_catvnoncat.h5"
+    test_dataset = h5py.File(test_filename, "r")
+    X_test = np.array(test_dataset["train_set_x"][:])
+    Y_test = np.array(test_dataset["train_set_y"][:])
+    # reshape from (m,) to (1, m)
+    Y_test = Y_test.reshape((1, Y_test.shape[0]))
+    X_test = preprocess(X_test)
+    p_test = L_predict(X_test, params)
+    print("Test accuracy: ", accuracy(p_test, Y_test))
+
+    # predict new image with pretrained parameters
+    imagename = "../images/Image.jpg"
+    prediction = L_classify(imagename, params)
+    print("The model predicts: ", prediction)
+
+    print()
+    print("Save params")
+    print("params.keys: ", params.keys())
+    paramsfilename = "../datasets/catvnoncat_params_2.npz"
+    L_save_params(params, paramsfilename)
+
+    newparams = L_load_params(paramsfilename)
+
+    print("Accuracy of model with loaded parameters")
+    # train accuracy
+    p = L_predict(X, newparams)
+    print("Train accuracy: ", accuracy(p, Y))
+    p_test = L_predict(X_test, newparams)
+    print("Test accuracy: ", accuracy(p_test, Y_test))
+
+    newnewparams, newnewcosts = L_layer_model_opt_continue(X, Y, newparams, seed, learning_rate, mini_batch_size,
+                                      beta, beta1, beta2, epsilon, num_epochs, print_on, plot_on)
 
     #print("newnewcosts: ", newnewcosts)
 
